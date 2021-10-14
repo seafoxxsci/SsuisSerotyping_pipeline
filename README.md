@@ -1,12 +1,44 @@
-*************************
-Running Ssuis_serotypingPipeline.pl
-*************************
+# Running Ssuis_serotypingPipeline.pl
 
-Dependencies for this pipeline are the same as those required for SRST2. As well, the provided SNP_AminoAcidChange.pl scripts must be located in the same directory as Ssuis_serotypingPipeline.pl.
+Dependencies for this pipeline are the same as those required for [SRST2](https://github.com/katholt/srst2). 
+As well, the provided SNP_AminoAcidChange.pl scripts must be located in the same directory as Ssuis_serotypingPipeline.pl.
 
+## Installation
+This installation guide assumes that you have python and conda already installed on your system.
+
+1. Create a new environment and installation tools
+```
+conda create -n ssuis_sero
+conda activate ssuis_sero
+conda install git pip
+```
+
+2. Install dependencies for SRST2
+```
+conda install -c conda-forge scipy
+conda install -c bioconda bowtie2=2.2.4
+conda install -c bioconda samtools=0.1.18-11
+git clone https://github.com/katholt/srst2
+pip install srst2/
+```
+
+4. Test the SRST2 installation
+```
+srst2 --version
+getmlst.py -h
+slurm_srst2.py -h
+```
+
+5. Install ssuis_sero directory from Github:
+```
+git clone https://github.com/seafoxxsci/SsuisSerotyping_pipeline
+```
+
+## Main executable and arguments for ssuis_sero
 The execution line for the pipeline is as follows:
-
+```
 perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --scoreName Scores_output_name
+```
 
 where Ssuis_serotypingPipeline.pl is the provided pipeline script, /path/to/fastq/directory is the path to the directory of the fastq files to be analyzed (Note: must be a full directory path, all fastq files in the folder will be analyzed). The pipeline runs with either single or paired-end reads, but looks for paired-end reads by default. There are optional commands --forward and --reverse used to indicate the names of the forward and reverse pairs, otherwise the program will assume pairs are named as _R1 and _R2 by default.
 
