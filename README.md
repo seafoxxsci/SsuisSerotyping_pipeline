@@ -47,11 +47,11 @@ All parameters are optional.  If the fastq directory is not provided then the cu
 Optional parameteres:
 --fastq_directory	Path to directory containing paired-end fastq files. Must be full path to directory, please do not use '.' or '..' to declare path. If no path is given, the current working directory is used.
 
-Argument | Explanation 
----|---
---scoreName | Name of SRST2 results file [optional: default name 'Results']
+| Argument | Explanation |
+|:-----|:------:|
+|`--scoreName`    ||Name of SRST2 results file [optional: default name 'Results']|
+|`--serotype_db`  |Multifasta file containing the serotype database (Ssuis_Serotyping.fasta) [If none is provided, Ssuis_Serotyping.fasta is looked for in the directory containing the script].|
 
---serotype_db		Multifasta file containing the serotype database (Ssuis_Serotyping.fasta) [If none is provided, Ssuis_Serotyping.fasta is looked for in the directory containing the script].
 
 --serotype_definitions	Text file containing the definitions for the serotype database file (Ssuis_Serotyping_Definitions.txt) [If none is provided, Ssuis_Serotyping_Definitions.txt is looked for in the directory containing the script].
 
