@@ -55,11 +55,11 @@ Optional parameteres:
 |`--cps2K`                |Multifasta file containing the cpsH confirmation database (Ssuis_cps2K.fasta) [If none is provided, Ssuis_cps2K.fasta is looked for in the directory containing the script].|
 |`--MLST_db`              |Multifasta file containing the MLST database (Streptococcus_suis.fasta) [If none is provided, Streptococcus_suis.fasta is looked for in the directory containing the script].|
 |`--MLST_definitions`     |Text file containing the definitions for the MLST database file (ssuis.txt) [If none is provided, ssuis.txt is looked for in the directory containing the script].|
-|`--recN_db`              |Fasta file containing the recN species specfic gene (recN_Full.fasta) [If none is provided, recN_full.fasta is looked for in the directory containing the script].|
+|`--recN_db`              |Fasta file containing the recN species specific gene (recN_Full.fasta) [If none is provided, recN_full.fasta is looked for in the directory containing the script].|
 |`Virulence_db`		        |Multifasta file containing the Virulence genes (Virulence.fasta) [If none is provided, Virulence.fasta is looked for in the directory containing the script].|
-|`--forward`              |Indicator delimiting the forward reads file for paired read fastq files. This option is ignored if single-end reads is selected [optional: default '_R1'].|
-|`--reverse`              |Indicator delimiting the reverse reads file for paired read fastq files. This option is ignored if single-end reads is selected [optional: default '_R2'].|
-|`--ends`			            |Indicates whether the reads are paired-end (pe) or single-end (se) [optional: default 'pe'].|
+|`--forward`              |Indicator delimiting the forward reads file for paired read fastq files. This option is ignored if single-end reads is selected [default: '_R1_'].|
+|`--reverse`              |Indicator delimiting the reverse reads file for paired read fastq files. This option is ignored if single-end reads is selected [default : '_R2_'].|
+|`--ends`			            |Indicates whether the reads are paired-end (pe) or single-end (se) [default: 'pe'].|
 
 The pipeline checks for the presence of the gene recN first, and all strains containing recN move on to the next steps of the SRST2 pipeline: Serotyping, MLST, and virulence genes. Once SRST2 has run, the output is moved into separate directories.  
 
@@ -69,9 +69,9 @@ Output from this pipeline analysis is contained in four directories:
 - “recN”
 - "Serotyping"
 - "MLST"
-- "Virulence." 
+- "Virulence" 
 
-These directories contain the samtools pileups, sorted bam files, and score files, as well as the original results of these analyses.  The Serotyping directory also contains the directory pipeline, containing the files for serotype 1, 14, 2, and 1/2 confirmation.  Final results are located in the 'Results'_FinalResults.txt file.
+Each of these directories contain the samtools pileups, sorted bam files, and score files, as well as the original results of these analyses.  The Serotyping directory also contains the directory pipeline, containing the files for serotype 1, 14, 2, and 1/2 confirmation.  Final results are located in the 'Results'_FinalResults.txt file.
 
 Please note: We recommend using paired end reads of at least 100nt in length and at least 30X coverage. We have not tested the efficiency of the pipeline with reads shorter than 80nt.
 The MLST database provided was downloaded from PubMLST (https://pubmlst.org/bigsdb?db=pubmlst_ssuis_seqdef) on September 29, 2021.  We recommend updating this database from time to time to guarantee accurate MLST assignment.
