@@ -13,7 +13,7 @@ conda activate ssuis_sero
 conda install git pip
 ```
 
-2. Install dependencies for SRST2
+2. Install dependencies and scripts for SRST2
 ```
 conda install -c conda-forge scipy
 conda install -c bioconda bowtie2=2.2.4
@@ -29,9 +29,10 @@ getmlst.py -h
 slurm_srst2.py -h
 ```
 
-5. Install ssuis_sero directory from Github:
+5. Install ssuis_sero directory from Github and test the installation:
 ```
 git clone https://github.com/seafoxxsci/SsuisSerotyping_pipeline
+Ssuis_serotypingPipeline.pl --help
 ```
 
 ## Main executable and arguments for ssuis_sero
@@ -40,15 +41,13 @@ The execution line for the pipeline is as follows:
 perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --scoreName Scores_output_name
 ```
 
-where Ssuis_serotypingPipeline.pl is the provided pipeline script, /path/to/fastq/directory is the path to the directory of the fastq files to be analyzed (Note: must be a full directory path, all fastq files in the folder will be analyzed). The pipeline runs with either single or paired-end reads, but looks for paired-end reads by default. There are optional commands --forward and --reverse used to indicate the names of the forward and reverse pairs, otherwise the program will assume pairs are named as _R1 and _R2 by default.
+where Ssuis_serotypingPipeline.pl is the provided pipeline script, /path/to/fastq/directory is the path to the directory of the fastq files to be analyzed (Note: must be a full directory path, all fastq files in the folder will be analyzed). The pipeline runs with either single or paired-end reads, but looks for paired-end reads by default. There are optional commands --forward and --reverse used to indicate the names of the forward and reverse pairs, otherwise the program will assume pairs are named as *_R1* and *_R2* by default.
 
-All parameters are optional.  If the fastq directory is not provided then the current working directory will be used.  If the current working directory does not contain fastq files, then the user will be prompted to provide an appropriate working directory.  If the database and fasta files are not provided, then they will be looked for in the directory containing the Ssuis_serotypingPipeline.pl script.  If the directory containing the script does not contain the database and fasta files, then the user will be prompted to provide these files.  To access the help file, the user can enter Ssuis_serotypingPipeline.pl --help.
-
-Optional parameteres:
---fastq_directory	Path to directory containing paired-end fastq files. Must be full path to directory, please do not use '.' or '..' to declare path. If no path is given, the current working directory is used.
+All parameters are optional.  If the fastq directory is not provided then the current working directory will be used.  If the current working directory does not contain fastq files, then the user will be prompted to provide an appropriate working directory.  If the database and fasta files are not provided, then they will be looked for in the directory containing the Ssuis_serotypingPipeline.pl script.  If the directory containing the script does not contain the database and fasta files, then the user will be prompted to provide these files.
 
 | Argument | Explanation |
 |:-----|:------:|
+|`--fastq_directory`      |Path to directory containing paired-end fastq files. Must be full path to directory, please do not use '.' or '..' to declare path. [If no path is given, the current working directory is used.]|
 |`--scoreName`            |Name of SRST2 results file [optional: default name 'Results']|
 |`--serotype_db`          |Multifasta file containing the serotype database (Ssuis_Serotyping.fasta) [If none is provided, Ssuis_Serotyping.fasta is looked for in the directory containing the script].|
 |`--serotype_definitions` |Text file containing the definitions for the serotype database file (Ssuis_Serotyping_Definitions.txt) [If none is provided, Ssuis_Serotyping_Definitions.txt is looked for in the directory containing the script].|
@@ -57,8 +56,8 @@ Optional parameteres:
 |`--MLST_definitions`     |Text file containing the definitions for the MLST database file (ssuis.txt) [If none is provided, ssuis.txt is looked for in the directory containing the script].|
 |`--recN_db`              |Fasta file containing the recN species specific gene (recN_Full.fasta) [If none is provided, recN_full.fasta is looked for in the directory containing the script].|
 |`Virulence_db`		        |Multifasta file containing the Virulence genes (Virulence.fasta) [If none is provided, Virulence.fasta is looked for in the directory containing the script].|
-|`--forward`              |Indicator delimiting the forward reads file for paired read fastq files. This option is ignored if single-end reads is selected [default: '_R1_'].|
-|`--reverse`              |Indicator delimiting the reverse reads file for paired read fastq files. This option is ignored if single-end reads is selected [default : '_R2_'].|
+|`--forward`              |Indicator delimiting the forward reads file for paired read fastq files. This option is ignored if single-end reads is selected [default: '*_R1*'].|
+|`--reverse`              |Indicator delimiting the reverse reads file for paired read fastq files. This option is ignored if single-end reads is selected [default : '*_R2*'].|
 |`--ends`			            |Indicates whether the reads are paired-end (pe) or single-end (se) [default: 'pe'].|
 
 The pipeline checks for the presence of the gene recN first, and all strains containing recN move on to the next steps of the SRST2 pipeline: Serotyping, MLST, and virulence genes. Once SRST2 has run, the output is moved into separate directories.  
