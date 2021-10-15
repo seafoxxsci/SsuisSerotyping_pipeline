@@ -1,5 +1,4 @@
 # Running Ssuis_serotypingPipeline.pl
-
 Dependencies for this pipeline are the same as those required for [SRST2](https://github.com/katholt/srst2). 
 As well, the provided SNP_AminoAcidChange.pl scripts must be located in the same directory as Ssuis_serotypingPipeline.pl.
 
@@ -35,7 +34,7 @@ git clone https://github.com/seafoxxsci/SsuisSerotyping_pipeline
 Ssuis_serotypingPipeline.pl --help
 ```
 
-## Main executable and arguments for ssuis_sero
+## Main executable and optional arguments for ssuis_sero
 The execution line for the pipeline is as follows:
 ```
 perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --scoreName Scores_output_name
