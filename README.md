@@ -9,13 +9,12 @@ This installation guide assumes that you have python and conda already installed
 ```
 conda create -n ssuis_sero
 conda activate ssuis_sero
-conda install git pip
+conda install git pip bowtie2
 ```
 
 2. Install dependencies and scripts for SRST2
 ```
 conda install -c conda-forge scipy
-conda install -c bioconda bowtie2=2.2.4
 conda install -c bioconda samtools=0.1.18-11
 git clone https://github.com/katholt/srst2
 pip install srst2/
