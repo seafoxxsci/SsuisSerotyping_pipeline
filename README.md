@@ -29,7 +29,7 @@ slurm_srst2.py -h
 5. Install ssuis_sero directory from Github and test the installation:
 ```
 git clone https://github.com/seafoxxsci/SsuisSerotyping_pipeline
-Ssuis_serotypingPipeline.pl --help
+perl Ssuis_serotypingPipeline.pl --help
 ```
 
 ## Main executable and default arguments for ssuis_sero
