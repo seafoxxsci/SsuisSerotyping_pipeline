@@ -32,7 +32,7 @@ git clone https://github.com/seafoxxsci/SsuisSerotyping_pipeline
 Ssuis_serotypingPipeline.pl --help
 ```
 
-## Main executable and optional arguments for ssuis_sero
+## Main executable and default arguments for ssuis_sero
 The execution line for the pipeline is as follows:
 ```
 perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --scoreName Scores_output_name
@@ -40,7 +40,8 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
 
 where Ssuis_serotypingPipeline.pl is the provided pipeline script, /path/to/fastq/directory is the path to the directory of the fastq files to be analyzed (Note: must be a full directory path, all fastq files in the folder will be analyzed). The pipeline runs with either single or paired-end reads, but looks for paired-end reads by default. There are optional commands --forward and --reverse used to indicate the names of the forward and reverse pairs, otherwise the program will assume pairs are named as *_R1* and *_R2* by default.
 
-All parameters are optional.  If the fastq directory is not provided then the current working directory will be used.  If the current working directory does not contain fastq files, then the user will be prompted to provide an appropriate working directory.  If the database and fasta files are not provided, then they will be looked for in the directory containing the Ssuis_serotypingPipeline.pl script.  If the directory containing the script does not contain the database and fasta files, then the user will be prompted to provide these files.
+## Optional arguments for ssuis_sero
+All parameters are optional.  If the fastq directory is not provided, then the current working directory will be used.  If the current working directory does not contain fastq files, then the user will be prompted to provide an appropriate working directory.  If the database and fasta files are not provided, then they will be looked for in the directory containing the Ssuis_serotypingPipeline.pl script.  If the directory containing the script does not contain the database and fasta files, then the user will be prompted to provide these files.
 
 | Argument | Explanation |
 |:-----|:------:|
@@ -69,7 +70,16 @@ Output from this pipeline analysis is contained in four directories:
 
 Each of these directories contain the samtools pileups, sorted bam files, and score files, as well as the original results of these analyses.  The Serotyping directory also contains the directory pipeline, containing the files for serotype 1, 14, 2, and 1/2 confirmation.  Final results are located in the 'Results'_FinalResults.txt file.
 
-Please note: We recommend using paired end reads of at least 100nt in length and at least 30X coverage. We have not tested the efficiency of the pipeline with reads shorter than 80nt.
-The MLST database provided was downloaded from PubMLST (https://pubmlst.org/bigsdb?db=pubmlst_ssuis_seqdef) on September 29, 2021.  We recommend updating this database from time to time to guarantee accurate MLST assignment.
+## Other documentation notes
+We recommend using paired end reads of at least 100nt in length and at least 30X coverage. We have not tested the efficiency of the pipeline with reads shorter than 80nt.
 
-Provided files: Ssuis_serotypingPipeline.pl, recN_full.fasta, Ssuis_Serotyping.fasta, Ssuis_Serotyping_Definitions.txt, Ssuis_cps2K.fasta, Streptococcus suis.fasta, ssuis.txt, Virulence.fasta, SNP_AminoAcidChange.pl
+The MLST database provided was downloaded from PubMLST (https://pubmlst.org/bigsdb?db=pubmlst_ssuis_seqdef) on September 29, 2021.  We recommend updating this database from time to time to guarantee accurate MLST assignment. Other provided files include: 
+- Ssuis_serotypingPipeline.pl
+- recN_full.fasta
+- Ssuis_Serotyping.fasta
+- Ssuis_Serotyping_Definitions.txt
+- Ssuis_cps2K.fasta
+- Streptococcus suis.fasta
+- ssuis.txt
+- Virulence.fasta
+- SNP_AminoAcidChange.pl
