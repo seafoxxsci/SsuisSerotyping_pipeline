@@ -17,6 +17,9 @@ conda install git pip bowtie2 samtools
 conda install -c conda-forge scipy
 git clone https://github.com/katholt/srst2
 pip install srst2/
+
+# Optional cleanup step:
+rm -r srst2/
 ```
 
 4. Test the SRST2 installation
