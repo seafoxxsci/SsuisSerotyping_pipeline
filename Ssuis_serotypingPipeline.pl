@@ -32,19 +32,9 @@ my $SingleOrPaired;
 
 my %opt=qw();
 GetOptions(\%opt, 
-	"help|h!", 
-	"fastq_directory:s", "scoreName:s", "serotype_db:s", 
-	"serotype_definitions:s", "cps2K:s", "MLST_db:s", 
-	"MLST_definitions:s", "recN_db:s", "Virulence_db:s", 
-	"forward:s", "reverse:s", "ends:s");
+	"help|h!", "fastq_directory:s", "scoreName:s", "serotype_db:s", "serotype_definitions:s", "cps2K:s", 
+	"MLST_db:s", "MLST_definitions:s", "recN_db:s", "Virulence_db:s", "forward:s", "reverse:s", "ends:s");
 
-use strict;
-use warnings;
-use Getopt::Long;
-
-my %opt = qw();
-
-GetOptions(\%opt, "help|h!", "fastq_directory:s", "scoreName:s", "serotype_db:s", "serotype_definitions:s", "cps2K:s", "MLST_db:s", "MLST_definitions:s", "recN_db:s", "Virulence_db:s", "forward:s", "reverse:s", "ends:s");
 
 if (exists($opt{"help"})) {
     print <<EOF;
@@ -57,9 +47,10 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
 
 --fastq_directory   Path to directory containing paired-end or single-end fastq files. Must be full path to 
 					directory. Please do not use '.' or '..' to declare path. 
-					[default: current working directory]
+					[default: your working directory]
 					
---scoreName         Name of SRST2 results file [default: 'Results']
+--scoreName         Name of SRST2 results file. 
+					[default: 'Results']
 
 --serotype_db       Multifasta file containing the serotype database.
                     [default: 'Ssuis_Serotyping.fasta' in the directory containing the script]
@@ -90,132 +81,55 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
 					option is ignored if 'se' is selected.
 					[default: '_R2']
 
---ends				Indicates whether the reads are paired-end 'pe' or single-end 'se' fastq files. Note: We recommend using paired-end reads of at least 100nt in length and 30X coverage. We have not tested the efficiency of this pipeline with reads shorter than 80nt.
-[default: 'pe']
+--ends				Indicates whether the reads are paired-end 'pe' or single-end 'se' fastq files. Note: 
+					We recommend using paired-end reads of at least 100nt in length and 30X coverage. We 
+					have not tested the efficiency of this pipeline with reads shorter than 80nt.
+					[default: 'pe']
 EOF
 }
 
 
-if(exists($opt{"fastq_directory"})){
-	$fastq_directory=$opt{"fastq_directory"};
-}
-else{
-	$fastq_directory=$working_dir;
-	my $any_fastqs=glob("*.fastq");
+#: Set values to defaults or to user-inputs; print an error message and exit if values are not provided
+my %inputs = (
+  "fastq_directory" => $working_dir,
+  "serotype_db" => $script_dir."/Ssuis_Serotyping.fasta",
+  "serotype_definitions" => $script_dir."/Ssuis_Serotyping_Definitions.txt",
+  "cps2K" => $script_dir."/Ssuis_cps2K.fasta",
+  "MLST_db" => $script_dir."/Streptococcus_suis.fasta",
+  "MLST_definitions" => $script_dir."/ssuis.txt",
+  "recN_db" => $script_dir."/recN_full.fasta",
+  "Virulence_db" => $script_dir."/Virulence.fasta",
+  "forward" => "_R1",
+  "reverse" => "_R2",
+  "ends" => "pe"
+);
 
-	if(!defined($any_fastqs)){	
-		print "Please provide the full path to the directory containing fastq files to use. See help file [--help]";
-		exit;
+foreach my $key (keys %inputs) {
+	if(exists($opt{$key})) {
+    	$inputs{$key} = $opt{$key};
+	} else {
+	if ($key eq "fastq_directory") {
+		$inputs{$key} = $workingdir;
+		my $any_fastqs = glob("*.fastq");
+		if (!defined($any_fastqs)) {
+			print "Please provide teh full path to the directory containing fastq files to use. See help 
+			file for additional details [--help]."
+			exit;
+			}
+		} else {
+  			my $file = $inputs{$key};
+			unless(-e $file) {
+    			print "Please provide the $key file(s). See help file for additional details [--help].";
+      			exit;
+			}
+		}
 	}
+	if ($key eq "ends") {
+	my $SingleOrPaired = $inputs{$key};
+	if(($SingleOrPaired ne "pe") and ($SingleOrPaired ne "se")){
+		die "Ends must be either pe or se";
 }
 
-if(exists($opt{"scoreName"})){
-	$scoresName=$opt{"scoreName"};
-}
-else{
-	$scoresName = "Results";
-}
-
-if(exists($opt{"serotype_db"})){
-	$fasta_input=$opt{"serotype_db"};
-}
-else{
-	$fasta_input=$script_dir."/Ssuis_Serotyping.fasta";
-	unless(-e $fasta_input){
-		print "Please provide the serotype database fasta file. See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"serotype_definitions"})){
-	$definitions_file=$opt{"serotype_definitions"};
-}
-else{
-	$definitions_file=$script_dir."/Ssuis_Serotyping_Definitions.txt";
-	unless(-e $definitions_file){
-		print "Please provide the serotype definitions file. See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"cps2K"})){
-	$gene_fasta=$opt{"cps2K"};
-}
-else{
-	$gene_fasta=$script_dir."/Ssuis_cps2K.fasta";
-	unless(-e $gene_fasta){
-		print "Please provide the cps2K database fasta file. See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"MLST_db"})){
-	$MLST_input=$opt{"MLST_db"};
-}
-else{
-	$MLST_input=$script_dir."/Streptococcus_suis.fasta";
-	unless(-e $MLST_input){
-		print "Please provide the MLST database fasta file. See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"MLST_definitions"})){
-	$MLST_definitions_file=$opt{"MLST_definitions"};
-}
-else{
-	$MLST_definitions_file=$script_dir."/ssuis.txt";
-	unless(-e $MLST_definitions_file){
-		print "Please provide the MLST definitions file. See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"recN_db"})){
-	$recN_input=$opt{"recN_db"};
-}
-else{
-	$recN_input=$script_dir."/recN_full.fasta";
-	unless(-e $recN_input){
-		print "Please provide the recN fasta file. See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"Virulence_db"})){
-	$virulence_input=$opt{"Virulence_db"};
-}
-else{
-	$virulence_input=$script_dir."/Virulence.fasta";
-	unless(-e $virulence_input){
-		print "Please provide the Virulence database fasta file.  See help file [--help]";
-		exit;
-	}
-}
-
-if(exists($opt{"forward"})){
-	$forward = $opt{"forward"};
-}
-else{
-	$forward = "_R1";
-}
-if(exists($opt{"reverse"})){
-	$reverse = $opt{"reverse"};
-}
-else{
-	$reverse = "_R2";
-}
-
-if(exists($opt{"ends"})){
-	$SingleOrPaired = $opt{"ends"};
-}
-else{
-	$SingleOrPaired = "pe";
-}
-
-if(($SingleOrPaired ne "pe") and ($SingleOrPaired ne "se")){
-	die "Ends must be either pe or se";
-}
 
 #CHECK IF STRAIN ACTUALLY BELONGS TO THE SPECIES STREPTOCOCCUS SUIS
 mkdir "recN";
