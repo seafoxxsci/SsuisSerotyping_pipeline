@@ -46,11 +46,11 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
 
 
 --fastq_directory   Path to directory containing paired-end or single-end fastq files. Must be full path to 
-					directory. Please do not use '.' or '..' to declare path. 
-					[default: your working directory]
+			directory. Please do not use '.' or '..' to declare path. 
+			[default: your working directory]
 					
 --scoreName         Name of SRST2 results file. 
-					[default: 'Results']
+			[default: 'Results']
 
 --serotype_db       Multifasta file containing the serotype database.
                     [default: 'Ssuis_Serotyping.fasta' in the directory containing the script]
@@ -74,22 +74,22 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
                   	[default: 'Virulence.fasta' in the directory containing the script]
 					
 --forward           Indicator delimiting the forward reads file for paired-end read fastq files. This 
-					option is ignored if 'se' is selected.
-					[default: '_R1']
+			option is ignored if 'se' is selected.
+			[default: '_R1']
 
---reverse			Indicator delimiting the reverse reads file for paired-end read fastq files. This 
-					option is ignored if 'se' is selected.
-					[default: '_R2']
+--reverse	    Indicator delimiting the reverse reads file for paired-end read fastq files. This 
+			option is ignored if 'se' is selected.
+			[default: '_R2']
 
---ends				Indicates whether the reads are paired-end 'pe' or single-end 'se' fastq files. Note: 
-					We recommend using paired-end reads of at least 100nt in length and 30X coverage. We 
-					have not tested the efficiency of this pipeline with reads shorter than 80nt.
-					[default: 'pe']
+--ends		    Indicates whether the reads are paired-end 'pe' or single-end 'se' fastq files. Note: 
+			We recommend using paired-end reads of at least 100nt in length and 30X coverage. We 
+			have not tested the efficiency of this pipeline with reads shorter than 80nt.
+			[default: 'pe']
 EOF
 }
 
 
-#: Set values to defaults or to user-inputs; print an error message and exit if values are not provided
+#: Set values to defaults 
 my %inputs = (
   "fastq_directory" => $working_dir,
   "serotype_db" => $script_dir."/Ssuis_Serotyping.fasta",
@@ -103,7 +103,7 @@ my %inputs = (
   "reverse" => "_R2",
   "ends" => "pe"
 );
-
+# Double-check that defaults or user-inputs present; print an error message and exit if values are not provided
 foreach my $key (keys %inputs) {
 	if(exists($opt{$key})) {
     	$inputs{$key} = $opt{$key};
@@ -131,20 +131,29 @@ foreach my $key (keys %inputs) {
 }
 
 
-#CHECK IF STRAIN ACTUALLY BELONGS TO THE SPECIES STREPTOCOCCUS SUIS
-mkdir "recN";
-chdir "recN";
+mkdir "recN" or die "Failed to create recN directory: $!";
+chdir "recN" or die "Failed to change recN directory: $!";
 
-if($SingleOrPaired eq "pe"){
-	system("srst2.py --input_pe $fastq_directory/*.fastq --forward $forward --reverse $reverse --output $scoresName\_recN --log --gene_db $recN_input --forward $forward --reverse $reverse --save_scores");
+#: Set up arguments for SRST2 based on whether input is paired-end reads or single-end reads
+my $srst2_args = "--log --gene_db $recN_input --save_scores";
+if ($SingleOrPaired eq "pe") {
+  $srst2_args .= " --input_pe $fastq_directory/*.fastq --forward $forward --reverse $reverse";
+} elsif ($SingleOrPaired eq "se") {
+  $srst2_args .= " --input_se $fastq_directory/*.fastq";
+} else { # Throw an error if input is neither paired-end 'pe' or single-end 'se'
+  die "Invalid value for SingleOrPaired: input must be 'se' or 'pe'. See help file for additional details [--help].";
 }
-elsif($SingleOrPaired eq "se"){
-	system("srst2.py --input_se $fastq_directory/*.fastq --output $scoresName\_recN --log --gene_db $recN_input --save_scores");
-}
+# Run SRST2 to check if the sequence file actually belongs to Streptococcus suis
+system("srst2.py $srst2_args --output $scoresName\_recN");
 
+
+#: Open the recN results file to verify that the SRST2 pipeline ran correctly
 my $recNResults = glob("$scoresName\_recN__genes*.txt");
+if (!defined($recNResults)) {
+  die "Failed to find recN results file";
+}
+open my $recNs, "<$recNResults" or die "Can't open recN results file: $!";
 
-open my $recNs, "<$recNResults" or die "Can't open recN results file!";
 
 my @ssuis;
 my @nonssuis;
