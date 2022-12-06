@@ -1,27 +1,22 @@
 #!/usr/bin/perl
 use strict;
 use warnings;
-$SIG{CHLD} = 'IGNORE';
-
-#MAKE SURE CHILD DIES IF KEYBOARD INTERUP SIGNAL
-$SIG{INT} = \&signal_handler;
-
-#MAKE SURE CHILD DIES IF KEYBOARD TERMINATE SIGNAL
-$SIG{TERM} = \&signal_handler;
-
-#First argument is the Fasta database file, second argument is the results from SRST2, should start in the same directory as the scores file.
 use File::Glob;
 use POSIX;
 use Getopt::Long;
 use Cwd 'abs_path';
-use Cwd;
 
-#Get path to script
+#: Make sure child dies if keyboard interrupts or kills the signal
+$SIG{CHLD} = 'IGNORE';
+$SIG{INT} = \&signal_handler;
+$SIG{TERM} = \&signal_handler;
+
+#First argument is the Fasta database file, second argument is the results from SRST2, should start in the same directory as the scores file.
+
+#: Get path to script and user inputs
 my $script_path = abs_path($0);
-my $script_dir = substr($script_path, 0, rindex($script_path, "/"));
+my $script_dir = dirname($script_path);
 my $working_dir = getcwd();
-
-#Get user input
 my $fastq_directory;
 my $scoresName;
 my $fasta_input;
@@ -36,25 +31,70 @@ my $reverse;
 my $SingleOrPaired;
 
 my %opt=qw();
+GetOptions(\%opt, 
+	"help|h!", 
+	"fastq_directory:s", "scoreName:s", "serotype_db:s", 
+	"serotype_definitions:s", "cps2K:s", "MLST_db:s", 
+	"MLST_definitions:s", "recN_db:s", "Virulence_db:s", 
+	"forward:s", "reverse:s", "ends:s");
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+my %opt = qw();
+
 GetOptions(\%opt, "help|h!", "fastq_directory:s", "scoreName:s", "serotype_db:s", "serotype_definitions:s", "cps2K:s", "MLST_db:s", "MLST_definitions:s", "recN_db:s", "Virulence_db:s", "forward:s", "reverse:s", "ends:s");
 
 if (exists($opt{"help"})) {
-	print "**********************************************\nImplementation of the S. suis serotyping pipeline:\n**********************************************\nperl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --scoreName Scores_output_name --serotype_db serotype.fasta -- serotype_definitions serotype_definitions.txt --cps2K cps2K.fasta\n\n";
-	print "--fastq_directory\tPath to directory containing paired-end fastq files.\n\t\t\tMust be full path to directory, please do not use '.'\n\t\t\tor '..' to declare path\n\t\t\tIf no path is given, the current working\n\t\t\tdirectory is used\n";
-	print "--scoreName\t\tName of SRST2 results file\n\t\t\t[optional: default name 'Results']\n";
-	print "--serotype_db\t\tMultifasta file containing the serotype database\n\t\t\t(Ssuis_Serotyping.fasta)\n\t\t\t[If none is provided, Ssuis_Serotyping.fasta is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--serotype_definitions\tText file containing the definitions for the\n\t\t\tserotype database file\n\t\t\t(Ssuis_Serotyping_Definitions.txt)\n\t\t\t[If none is provided, Ssuis_Serotyping_Definitions.txt is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--cps2K\t\tMultifasta file containing the cpsH confirmation database\n\t\t\t(Ssuis_cps2K.fasta)\n\t\t\t[If none is provided, Ssuis_cps2K.fasta is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--MLST_db\t\tMultifasta file containing the MLST database\n\t\t\t(Streptococcus_suis.fasta)\n\t\t\t[If none is provided, Streptococcus_suis.fasta is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--MLST_definitions\tText file containing the definitions for the\n\t\t\tMLST database file\n\t\t\t(ssuis.txt)\n\t\t\t[If none is provided, ssuis.txt is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--recN_db\t\tFasta file containing the recN species specfic gene\n\t\t\t(recN_Full.fasta)\n\t\t\t[If none is provided, recN_full.fasta is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--Virulence_db\t\tMultifasta file containing the Virulence genes\n\t\t\t(Virulence.fasta)\n\t\t\t[If none is provided, Virulence.fasta is looked\n\t\t\tfor in the directory containing the script]\n";
-	print "--forward\t\tIndicator delimiting the forward reads file for\n\t\t\tpaired read fastq files\nThis option is ignored if single-end reads is selected\n\t\t\t[optional: default '_R1']\n";
-	print "--reverse\t\tIndicator delimiting the reverse reads file for\n\t\t\tpaired read fastq files\nThis option is ignored if single-end reads is selected\n\t\t\t[optional: default '_R2']\n\n";
-	print "--ends\t\tIndicates whether the reads are paired-end (pe) or single-end (se)\n\t\t\t[optional: default 'pe']\n\n";
-	print "Note: We recommend using paired end reads of at least 100nt in length\nand at least 30X coverage.\nWe have not tested the efficiency of the pipeline with reads shorter than 80nt.";
-	exit;
+    print <<EOF;
+**********************************************
+Implementation of the Streptococcus suis serotyping pipeline:
+**********************************************
+
+perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --scoreName Scores_output_name --serotype_db serotype.fasta -- serotype_definitions serotype_definitions.txt --cps2K cps2K.fasta
+
+
+--fastq_directory   Path to directory containing paired-end or single-end fastq files. Must be full path to 
+					directory. Please do not use '.' or '..' to declare path. 
+					[default: current working directory]
+					
+--scoreName         Name of SRST2 results file [default: 'Results']
+
+--serotype_db       Multifasta file containing the serotype database.
+                    [default: 'Ssuis_Serotyping.fasta' in the directory containing the script]
+					
+--serotype_definitions   Text file containing the definitions for the serotype database file.
+                    [default: 'Ssuis_Serotyping_Definitions.txt' in the directory containing the script]
+					
+--cps2K             Multifasta file containing the cpsH confirmation database.
+                    [default: 'Ssuis_cps2K.fasta' in the directory containing the script]
+					
+--MLST_db           Multifasta file containing the MLST database.
+                    [default: 'Streptococcus_suis.fasta' in the directory containing the script]
+					
+--MLST_definitions  Text file containing the definitions for the MLST database file.
+                    [default: 'ssuis.txt' in the directory containing the script]
+
+--recN_db           Fasta file containing the recN species specfic gene.
+                    [default: 'recN_Full.fasta' in the directory containing the script]
+					
+--Virulence_db      Multifasta file containing the Virulence genes.
+                  	[default: 'Virulence.fasta' in the directory containing the script]
+					
+--forward           Indicator delimiting the forward reads file for paired-end read fastq files. This 
+					option is ignored if 'se' is selected.
+					[default: '_R1']
+
+--reverse			Indicator delimiting the reverse reads file for paired-end read fastq files. This 
+					option is ignored if 'se' is selected.
+					[default: '_R2']
+
+--ends				Indicates whether the reads are paired-end 'pe' or single-end 'se' fastq files. Note: We recommend using paired-end reads of at least 100nt in length and 30X coverage. We have not tested the efficiency of this pipeline with reads shorter than 80nt.
+[default: 'pe']
+EOF
 }
+
 
 if(exists($opt{"fastq_directory"})){
 	$fastq_directory=$opt{"fastq_directory"};
