@@ -5,6 +5,7 @@ use File::Glob;
 use POSIX;
 use Getopt::Long;
 use Cwd 'abs_path';
+use autodie::io;
 
 #: Make sure child dies if keyboard interrupts or kills the signal
 $SIG{CHLD} = 'IGNORE';
@@ -82,8 +83,8 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
 			[default: '_R2']
 
 --ends		    Indicates whether the reads are paired-end 'pe' or single-end 'se' fastq files. Note: 
-			We recommend using paired-end reads of at least 100nt in length and 30X coverage. We 
-			have not tested the efficiency of this pipeline with reads shorter than 80nt.
+			We recommend using paired-end reads of at least 100nt in length and 30X coverage. 
+			We have not tested the efficiency of this pipeline with reads shorter than 80nt.
 			[default: 'pe']
 EOF
 }
@@ -152,7 +153,7 @@ my $recNResults = glob("$scoresName\_recN__genes*.txt");
 if (!defined($recNResults)) {
   die "Failed to find recN results file";
 }
-open my $recNs, "<$recNResults" or die "Can't open recN results file: $!";
+open my $recNs, "<", $recNResults or die "Can't open recN results file: $!";
 
 #: Initialize arrays to store filenames of Streptococcus suis and non-Streptococcus suis samples
 my @ssuis;
@@ -202,7 +203,7 @@ if(scalar(@ssuis) < 1){
 	exit;
 }
 
-#: Create MLST, Virulence, and Serotype directories; organize system commands now that you have SRST2 ran
+#: Prepare system commands that actually use SRST2 on sequences that are in the @ssuis array
 my @commands;
 if($SingleOrPaired eq "pe"){
 	@commands = ("srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName\_MLST --log --mlst_db $MLST_input --mlst_definitions $MLST_definitions_file --save_scores", 
@@ -214,13 +215,14 @@ if($SingleOrPaired eq "pe"){
 	"srst2.py --input_se $ss --output $scoresName --log --mlst_db $fasta_input --mlst_definitions $definitions_file --save_scores");
 }
 
-#: For each command in the @commands array, change into that directory and execute the respective command
 my @dirs = ("MLST", "Virulence", "Serotype");
 my $prev_pid;
 chdir "..";
+
+#: For each command in the @commands array, execute the respective command
 foreach my $i (0 .. $#commands) {
-	mkdir $dirs[$i];
-    	chdir $dirs[$i];
+	mkdir $dirs[$i]; # Create the results directory that corresponds to each $command
+    	chdir $dirs[$i]; 
 
    	my $pid = fork();
     	if ($pid == 0) {
@@ -232,7 +234,7 @@ foreach my $i (0 .. $#commands) {
 			my $ResultsName = glob("$scoresName\__mlst__*.txt");
 			# Checks to see if the output file ResultsName has any results
 			if ((-s $ResultsName) < 50){
-				print "Can't run Serotyping!";
+				print "Unable to run $dirs[$i] analysis!";
 				&signal_handler;
 			}
 		} 
@@ -255,44 +257,42 @@ foreach my $i (0 .. $#commands) {
 }
 
 
-#Read in results of SRST2
-open my $srst2_results, "<$ResultsName" or die "Can't open Serotyping results file!";
+# Read in the final results from the 3-part SRST2 pipeline 
+open(my $srst2_results, "<", $ResultsName) or die "Can't open Serotype results file!"
 
-mkdir "Pipeline";
-open my $EndResults, ">", "$scoresName\_FinalSerotypingResults.txt" or die $!;
+#: Write a new file called FinalSerotypingResults.txt; add Strain and Serotype headers
+open my $EndResults, ">", "$scoresName\_FinalSerotypingResults.txt";
+print $EndResults "Strain\tSerotype\n"; 
 
-print $EndResults "Strain\tSerotype\n";
-
-#READING IN SEROTYPE CALLING RESULTS#
+#: Determine how to parse serotypes out individually from <$srst2_results> opened in 261
 my $resultCount = 0;
-my @furtherAnalysis_1;
-my @furtherAnalysis_2;
+@furtherAnalysis_1 = map { $reading[0] } grep { ($reading[1] eq "1") || ($reading[1] eq "1*") || ($reading[1] eq "1?") || ($reading[1] eq "1*?") } @reading;
+@furtherAnalysis_2 = map { $reading[0] } grep { ($reading[1] eq "2") || ($reading[1] eq "2*") || ($reading[1] eq "2?") || ($reading[1] eq "2*?") } @reading;
 my @notTesting;
-foreach my $result (<$srst2_results>){
-	$result =~ s/\r?\n//;
-
-	if($resultCount > 0){
+foreach my $result (<$srst2_results>){ # Loop through each serotype call in <$srst2_results>:
+	chomp $result; # 1a. Remove newline characters from the end of a string 
+	if($resultCount > 0){ # 1b, Skip the header line created in 265
 		my @reading = split(/\t/, $result);
-		#IF SEROTYPE IS CALLED AS A 1, PUT IN ARRAY TO CHECK IF IT IS A 1 OR A 14#
-		if(($reading[1] eq "1") || ($reading[1] eq "1*") || ($reading[1] eq "1?") || ($reading[1] eq "1*?")){
-			push(@furtherAnalysis_1, $reading[0]);
-		}
-		#IF SEROTYPE IS CALLED AS A 2, PUT IN ARRAY TP CHECK IF IT IS A 2 OR A 1/2#
-		elsif(($reading[1] eq "2") || ($reading[1] eq "2*") || ($reading[1] eq "2?") || ($reading[1] eq "2*?")){
-			push(@furtherAnalysis_2, $reading[0]);
-		}
-		#IF SEROTYPE IS NEITHER A 1 OR A 2, PRINT RESULTS TO FILE#
-		else{
-			push(@notTesting, ($reading[0] . "\t" . $reading[1]));
-			print $EndResults "$reading[0]\t$reading[1]\n";
-		}
+		given ($reading[1]) {
+			# 2. Check against @furtherAnalysis_1 to determine 1 or 14
+			when (/1*/) { push(@furtherAnalysis_1, $reading[0]); }
+			# 3. Check against @furtherAnalysis_2 to determine 2 or 1/2
+			when (/2*/) { push(@furtherAnalysis_2, $reading[0]); } 
+			# 4. Else print the serotype result directly
+			default { 
+				push(@@notTesting, ($reading[0] . "\t" . $reading[1]));
+				print $EndResults "$reading[0]\t$reading[1]\n";
+			}
+		}					
 	}
-	$resultCount++;
+	$resultCount++; # Move to next results line containing non-header data
 }
-
+# Save the original $srst2_results file back as InitialCapsuleResults.txt
 close($srst2_results);
 system("mv $ResultsName $scoresName\_InitialCapsuleResults.txt");
 
+###: TODO PLACEHOLDER FOR CHRISTINE TO CONTINUE EDITING ###
+mkdir "Pipeline";
 chdir "Pipeline";
 
 #CREATE BOWTIE AND SAMTOOLS INDEX FILES FOR CPSK FASTA FILE#
@@ -436,14 +436,9 @@ foreach my $two (@furtherAnalysis_2){
 }
 
 #SORT OUTPUT FILES#
-system("mkdir sam");
-system("mkdir unsorted_bam");
-system("mkdir sorted_bam");
-system("mkdir pileup");
-system("mkdir raw_vcf");
-system("mkdir filtered_vcf");
-system("mkdir snps");
-system("mkdir snp_effect");
+system("mkdir filtered_vcf pileup raw_vcf sam scores sorted_bam snp_effect snps")
+system("mv *.pileup ./pileup && mv *.sorted.bam ./sorted_bam && mv *.scores ./scores");
+
 system("mv *.sam ./sam");
 system("mv *.sorted.bam ./sorted_bam");
 system("mv *.bam ./unsorted_bam");
@@ -455,17 +450,7 @@ system("mv *SNPeffect.txt ./snp_effect");
 
 #WAIT FOR MLST TO FINISH BEFORE MOVING ON TO ORGANIZATION STEP
 wait();
-
 chdir "../../MLST";
-
-#Organize SRST2 output
-system("mkdir pileups");
-system("mkdir sorted_bam");
-system("mkdir scores");
-system("mv *.pileup ./pileups");
-system("mv *.sorted.bam ./sorted_bam");
-system("mv *.scores ./scores");
-
 my $mlst_Name = glob("$scoresName\_MLST__mlst__*.txt");
 
 #Read in results of SRST2
