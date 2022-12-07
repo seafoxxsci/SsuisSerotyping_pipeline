@@ -53,22 +53,22 @@ perl Ssuis_serotypingPipeline.pl --fastq_directory /path/to/fastq/directory --sc
 			[default: 'Results']
 
 --serotype_db       Multifasta file containing the serotype database.
-                    [default: 'Ssuis_Serotyping.fasta' in the directory containing the script]
+                    	[default: 'Ssuis_Serotyping.fasta' in the directory containing the script]
 					
 --serotype_definitions   Text file containing the definitions for the serotype database file.
-                    [default: 'Ssuis_Serotyping_Definitions.txt' in the directory containing the script]
+                    	[default: 'Ssuis_Serotyping_Definitions.txt' in the directory containing the script]
 					
 --cps2K             Multifasta file containing the cpsH confirmation database.
-                    [default: 'Ssuis_cps2K.fasta' in the directory containing the script]
+                    	[default: 'Ssuis_cps2K.fasta' in the directory containing the script]
 					
 --MLST_db           Multifasta file containing the MLST database.
-                    [default: 'Streptococcus_suis.fasta' in the directory containing the script]
+                    	[default: 'Streptococcus_suis.fasta' in the directory containing the script]
 					
 --MLST_definitions  Text file containing the definitions for the MLST database file.
-                    [default: 'ssuis.txt' in the directory containing the script]
+                    	[default: 'ssuis.txt' in the directory containing the script]
 
 --recN_db           Fasta file containing the recN species specfic gene.
-                    [default: 'recN_Full.fasta' in the directory containing the script]
+                    	[default: 'recN_Full.fasta' in the directory containing the script]
 					
 --Virulence_db      Multifasta file containing the Virulence genes.
                   	[default: 'Virulence.fasta' in the directory containing the script]
@@ -89,7 +89,7 @@ EOF
 }
 
 
-#: Set values to defaults 
+#: Set values to defaults in an array
 my %inputs = (
   "fastq_directory" => $working_dir,
   "serotype_db" => $script_dir."/Ssuis_Serotyping.fasta",
@@ -103,7 +103,7 @@ my %inputs = (
   "reverse" => "_R2",
   "ends" => "pe"
 );
-# Double-check that defaults or user-inputs present; print an error message and exit if values are not provided
+# Double-check that defaults or user-inputs are present for each flag; print an error message and exit if values are not provided
 foreach my $key (keys %inputs) {
 	if(exists($opt{$key})) {
     	$inputs{$key} = $opt{$key};
@@ -112,7 +112,7 @@ foreach my $key (keys %inputs) {
 		$inputs{$key} = $workingdir;
 		my $any_fastqs = glob("*.fastq");
 		if (!defined($any_fastqs)) {
-			print "Please provide teh full path to the directory containing fastq files to use. See help 
+			print "Please provide the full path to the directory containing fastq files to use. See help 
 			file for additional details [--help]."
 			exit;
 			}
@@ -154,122 +154,106 @@ if (!defined($recNResults)) {
 }
 open my $recNs, "<$recNResults" or die "Can't open recN results file: $!";
 
-
+#: Initialize arrays to store filenames of Streptococcus suis and non-Streptococcus suis samples
 my @ssuis;
 my @nonssuis;
+
+#: Read the recN results file line-by-line:
 my $recCount = 0;
-foreach my $recN (<$recNs>){
-	$recN =~ s/\r?\n//;
+while (my $recN = <$recNs>) {
+	$recN =~ s/\r?\n//; # Remove any line breaks from the end of each line
 
-	if($recCount > 0){
+	if ($recCount > 0) { 
+		# Split lines on whitespace characters to get sample and gene names; skip the header
 		my @info = split(/\s+/, $recN);
-
-		if(scalar(@info) > 1){
+		next if $recN == 0;
+		
+		#: For all other lines, which contain sample and gene names (more than one field)
+		if (scalar(@info) > 1) {
+			# Check if the gene name starts with recN
 			if(substr($info[1], 0, 4) eq "recN"){
+				# Add both fastq files to the list of S. suis samples if paired-end
 				if($SingleOrPaired eq "pe"){
 					push(@ssuis, "$fastq_directory/$info[0]$forward.fastq");
 					push(@ssuis, "$fastq_directory/$info[0]$reverse.fastq");
-				}
-				elsif($SingleOrPaired eq "se"){
+				} elsif($SingleOrPaired eq "se"){ # Add the fastq file if single-end
 					push(@ssuis, "$fastq_directory/$info[0]*.fastq");
 				}
 			}
-			else{push(@nonssuis, $info[0])};
+			# If the gene name doesn't start with recN, add sample to the non-S. suis list
+			else{push(@nonssuis, $info[0])}; 
 		}
 	}
-
 	$recCount++;
 }
 
 my $ss = join(' ', @ssuis);
 
-#ORGANIZE SPECIES CONFIRMATION OUTPUT
-system("mkdir pileups");
-system("mkdir sorted_bam");
-system("mkdir scores");
-system("mv *.pileup ./pileups");
-system("mv *.sorted.bam ./sorted_bam");
-system("mv *.scores ./scores");
+#: Organize species outputs from the SRST2 analysis of recN gene hits in each sample
+system("mkdir pileups sorted_bam scores")
+system("mv *.pileup ./pileups && mv *.sorted.bam ./sorted_bam && mv *.scores ./scores");
 
 close($recNs);
 system("mv $recNResults $scoresName\_speciesConfirmation.txt");
 
-#Check if there are any S. suis in the dataset
+# Check if there are any Streptococcus suis samples in the dataset
 if(scalar(@ssuis) < 1){
-	print "No S. suis in the dataset";
+	print "No Streptococcus suis samples are in the dataset";
 	exit;
 }
 
-#ORGANIZE SYSTEM COMMANDS
+#: Create MLST, Virulence, and Serotype directories; organize system commands now that you have SRST2 ran
 my @commands;
 if($SingleOrPaired eq "pe"){
-	@commands = ("srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName\_MLST --log --mlst_db $MLST_input --mlst_definitions $MLST_definitions_file --save_scores", "srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName\_VirulenceFactors --log --gene_db $virulence_input --save_scores", "srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName --log --mlst_db $fasta_input --mlst_definitions $definitions_file --save_scores");
-}
-elsif($SingleOrPaired eq "se"){
-	@commands = ("srst2.py --input_se $ss --output $scoresName\_MLST --log --mlst_db $MLST_input --mlst_definitions $MLST_definitions_file --save_scores", "srst2.py --input_se $ss --output $scoresName\_VirulenceFactors --log --gene_db $virulence_input --save_scores", "srst2.py --input_se $ss --output $scoresName --log --mlst_db $fasta_input --mlst_definitions $definitions_file --save_scores");
+	@commands = ("srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName\_MLST --log --mlst_db $MLST_input --mlst_definitions $MLST_definitions_file --save_scores", 
+	"srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName\_VirulenceFactors --log --gene_db $virulence_input --save_scores", 
+	"srst2.py --input_pe $ss --forward $forward --reverse $reverse --output $scoresName --log --mlst_db $fasta_input --mlst_definitions $definitions_file --save_scores");
+} elsif ($SingleOrPaired eq "se") {
+	@commands = ("srst2.py --input_se $ss --output $scoresName\_MLST --log --mlst_db $MLST_input --mlst_definitions $MLST_definitions_file --save_scores", 
+	"srst2.py --input_se $ss --output $scoresName\_VirulenceFactors --log --gene_db $virulence_input --save_scores", 
+	"srst2.py --input_se $ss --output $scoresName --log --mlst_db $fasta_input --mlst_definitions $definitions_file --save_scores");
 }
 
+#: For each command in the @commands array, change into that directory and execute the respective command
+my @dirs = ("MLST", "Virulence", "Serotype");
+my $prev_pid;
 chdir "..";
-mkdir "MLST";
-chdir "MLST";
+foreach my $i (0 .. $#commands) {
+	mkdir $dirs[$i];
+    	chdir $dirs[$i];
 
-my $pid1 = fork();
-if ($pid1 == 0){
-	setpgrp;
-	system($commands[0]);
-	exit 0;
+   	my $pid = fork();
+    	if ($pid == 0) {
+        	setpgrp;
+		system($commmands[$i]);
+		
+		#: Files in the Serotype directory are handled slightly differently
+		if ($i == 2) {
+			my $ResultsName = glob("$scoresName\__mlst__*.txt");
+			# Checks to see if the output file ResultsName has any results
+			if ((-s $ResultsName) < 50){
+				print "Can't run Serotyping!";
+				&signal_handler;
+			}
+		} 
+		exit 0;
+    	}
+	# If the previous command is still running, kill it; else run the next command
+	if ($prev_pid) {
+		sleep(1);
+    		my $status = waitpid($prev_pid, WNOHANG);
+		if ($status == 0) { 
+			print "Unable to run $dirs[$i] analysis, killing this command..."
+			kill "TERM", $prev_pid;
+			waitpid($prev_pid, 0);
+			exit;
+		} else {
+			print "Done with $dirs[$i] analysis, running the next command..."
+		}
+	}
+	$prev_pid = $pid
 }
 
-#WAIT 1 SECOND, THEN CHECK IF MLST IS STILL RUNNING, IF NOT -> KILL PROGRAM
-sleep(1);
-my $exists = kill 0, $pid1;
-if($exists == 0){
-	print "Unable to run MLST!";
-	exit;
-}
-
-chdir "..";
-mkdir "Virulence";
-chdir "Virulence";
-
-#RUN VIRULENCE PIPELINE
-my $pid2 = fork();
-if ($pid2 == 0){
-	setpgrp;
-	system($commands[1]);
-	exit 0;
-}
-
-#WAIT 1 SECOND, THEN CHECK IF MLST IS STILL RUNNING, IF NOT -> KILL PROGRAM
-sleep(1);
-my $exists2 = kill 0, $pid2;
-if($exists2 == 0){
-	print "Unable to run virulence check!";
-	exit;
-}
-
-chdir "..";
-mkdir "Serotyping";
-chdir "Serotyping";
-
-#RUN SEROTYPING PIPELINE
-system($commands[2]);
-
-my $ResultsName = glob("$scoresName\__mlst__*.txt");
-
-#Checks if output file has any results
-if ((-s $ResultsName) < 50){
-	print "Can't run Serotyping!";
-	&signal_handler;
-}
-
-#Organize SRST2 output
-system("mkdir pileups");
-system("mkdir sorted_bam");
-system("mkdir scores");
-system("mv *.pileup ./pileups");
-system("mv *.sorted.bam ./sorted_bam");
-system("mv *.scores ./scores");
 
 #Read in results of SRST2
 open my $srst2_results, "<$ResultsName" or die "Can't open Serotyping results file!";
