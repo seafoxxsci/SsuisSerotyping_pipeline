@@ -138,11 +138,11 @@ chdir "recN" or die "Failed to change recN directory: $!";
 #: Set up arguments for SRST2 based on whether input is paired-end reads or single-end reads
 my $srst2_args = "--log --gene_db $recN_input --save_scores";
 if ($SingleOrPaired eq "pe") {
-  $srst2_args .= " --input_pe $fastq_directory/*.fastq --forward $forward --reverse $reverse";
+	$srst2_args .= " --input_pe $fastq_directory/*.fastq --forward $forward --reverse $reverse";
 } elsif ($SingleOrPaired eq "se") {
-  $srst2_args .= " --input_se $fastq_directory/*.fastq";
+  	$srst2_args .= " --input_se $fastq_directory/*.fastq";
 } else { # Throw an error if input is neither paired-end 'pe' or single-end 'se'
-  die "Invalid value for SingleOrPaired: input must be 'se' or 'pe'. See help file for additional details [--help].";
+  	die "Invalid value for SingleOrPaired: input must be 'se' or 'pe'. See help file for additional details [--help].";
 }
 # Run SRST2 to check if the sequence file actually belongs to Streptococcus suis
 system("srst2.py $srst2_args --output $scoresName\_recN");
@@ -151,14 +151,12 @@ system("srst2.py $srst2_args --output $scoresName\_recN");
 #: Open the recN results file to verify that the SRST2 pipeline ran correctly
 my $recNResults = glob("$scoresName\_recN__genes*.txt");
 if (!defined($recNResults)) {
-  die "Failed to find recN results file";
+  	die "Failed to find recN results file";
 }
 open my $recNs, "<", $recNResults or die "Can't open recN results file: $!";
 
 #: Initialize arrays to store filenames of Streptococcus suis and non-Streptococcus suis samples
-my @ssuis;
-my @nonssuis;
-
+my (@ssuis, @nonssuis);
 #: Read the recN results file line-by-line:
 my $recCount = 0;
 while (my $recN = <$recNs>) {
@@ -191,9 +189,6 @@ while (my $recN = <$recNs>) {
 my $ss = join(' ', @ssuis);
 
 #: Organize species outputs from the SRST2 analysis of recN gene hits in each sample
-system("mkdir pileups sorted_bam scores")
-system("mv *.pileup ./pileups && mv *.sorted.bam ./sorted_bam && mv *.scores ./scores");
-
 close($recNs);
 system("mv $recNResults $scoresName\_speciesConfirmation.txt");
 
@@ -291,158 +286,82 @@ foreach my $result (<$srst2_results>){ # Loop through each serotype call in <$sr
 close($srst2_results);
 system("mv $ResultsName $scoresName\_InitialCapsuleResults.txt");
 
-###: TODO PLACEHOLDER FOR CHRISTINE TO CONTINUE EDITING ###
+#: Create bowtie2 and samtools files for cpsK gene analysis
 mkdir "Pipeline";
 chdir "Pipeline";
+system("bowtie2-build $gene_fasta $gene_fasta \
+	&& samtools faidx $gene_fasta");
 
-#CREATE BOWTIE AND SAMTOOLS INDEX FILES FOR CPSK FASTA FILE#
-system("bowtie2-build $gene_fasta $gene_fasta");
-system("samtools faidx $gene_fasta");
+#: For all samples initially with serotype 1, align to cpsK gene to drill down to 1 or 14
+my $i = 0;
+foreach my $element (@furtherAnalysis_1, @furtherAnalysis_2) {
 
-#FOR ALL OF THE 1s ALIGN TO CPSK FASTA TO SEE IF IT IS A 1 OR A 14#
-foreach my $one (@furtherAnalysis_1){
+	my $sample = $i < @furtherAnalysis_1 ? "one" : "two";
 	#Run Bowtie2 against cpsK
 	if($SingleOrPaired eq "pe"){
-		system("bowtie2 -1 $fastq_directory/$one$forward.fastq $fastq_directory/$one$reverse.fastq -S $one\_vs_cpsK.sam --very-sensitive-local --no-unal -a -x $gene_fasta");
+		system("bowtie2 -1 $fastq_directory/${sample}$forward.fastq $fastq_directory/${sample}everse.fastq -S ${sample}\_vs_cpsK.sam --very-sensitive-local --no-unal -a -x $gene_fasta");
+	} elsif($SingleOrPaired eq "se") {
+		system("bowtie2 -U $fastq_directory/${sample}*.fastq -S ${sample}\_vs_cpsK.sam --very-sensitive-local --no-unal -a -x $gene_fasta");
 	}
-	elsif($SingleOrPaired eq "se"){
-		system("bowtie2 -U $fastq_directory/$one*.fastq -S $one\_vs_cpsK.sam --very-sensitive-local --no-unal -a -x $gene_fasta");
-	}
-	#Run Samtools to call SNPs
-	system("samtools view -b -o $one\_vs_cpsK.bam -q 1 -S $one\_vs_cpsK.sam");
-	system("samtools sort $one\_vs_cpsK.bam $one\_vs_cpsK.sorted");
-	system("samtools mpileup -u -L 1000 -f $gene_fasta -Q 20 -q 1 $one\_vs_cpsK.sorted.bam > $one\_vs_cpsK.pileup");
-	system("bcftools view -vcg $one\_vs_cpsK.pileup > $one\_vs_cpsK.raw.vcf");
-	system("vcfutils.pl varFilter -Q 20 $one\_vs_cpsK.raw.vcf > $one\_vs_cpsK.vcf");
 
-	open my $vcf, "<$one\_vs_cpsK.vcf" or die "Can't find input file!";
-	open my $vcf_out, ">", "$one\_vs_cpsK.snps" or die $!;
+	# Run samtools to call SNPs
+	system("samtools view -b -o ${sample}\_vs_cpsK.bam -q 1 -S ${sample}\_vs_cpsK.sam \
+	 	&& samtools sort ${sample}\_vs_cpsK.bam ${sample}e\_vs_cpsK.sorted \
+		&& samtools mpileup -u -L 1000 -f $gene_fasta -Q 20 -q 1 ${sample}\_vs_cpsK.sorted.bam > ${sample}\_vs_cpsK.pileup \
+		&& bcftools view -vcg ${sample}\_vs_cpsK.pileup > ${sample}\_vs_cpsK.raw.vcf \
+		&& vcfutils.pl varFilter -Q 20 ${sample}\_vs_cpsK.raw.vcf > ${sample}\_vs_cpsK.vcf");
 
-	#Re-write SNP file to a more readable format
+	open my $vcf, "<", "${sample}\_vs_cpsK.vcf" or die "Could not open ${sample}\_vs_cpsK.vcf as an input!";
+	open my $vcf_out, ">", "${sample}\_vs_cpsK.snps" or die "Could not write out SNPs results!"
+
+	# Re-write SNPs file to a more readable format (skip lines that start with ##)
 	foreach my $vcf_line (<$vcf>){
-		if(substr($vcf_line, 0, 2) ne "##"){
-			print $vcf_out $vcf_line;
-		}
+		next if $vcf_line =~ /^##/;
+		print $vcf_out $vcf_line;
 	}
+	open my $SNP_out, ">", "${sample}\_SNPeffect.txt" or die "Could not write out condensed SNP results!"
 
-	open my $SNP_out, ">", "$one\_SNPeffect.txt" or die $!;
+	# Check for amino acid changes (indels, substitutions, etc) caused by SNPs
+	system("perl $script_dir/SNP_AminoAcidChange.pl ${sample}\_vs_cpsK.snps $gene_fasta > ${sample}\_SNPeffect.txt");
+	open my $SNP_read, "<", "${sample}\_SNPeffect.txt" or die "Can't open condensed SNP results file!";
 
-	#Check AminoAcid changes caused by SNPs
-	system("perl $script_dir/SNP_AminoAcidChange.pl $one\_vs_cpsK.snps $gene_fasta > $one\_SNPeffect.txt");
-
-	#READ IN SNP EFFFECT FILE TO CHECK IF THERE IS A TRP OR CYS AT AMINO ACID POSITION 161#
-	open my $SNP_read, "<$one\_SNPeffect.txt" or die "Can't open input file!";
-
-	my @SNP_array;
-	my $SNP_line = 0;
-	my $Target = 0;
-	my $AminoAcid;
-	foreach my $snp(<$SNP_read>){
-		if($SNP_line > 0){
-		        @SNP_array = split(/\t/, $snp);
-			
-			if($SNP_array[5] == 161){
-				$Target = 1;
-				$AminoAcid = $SNP_array[7];
-			}
-		}
-		$SNP_line++;
-	}
-
-	#IF THERE WAS A SNP AT POSITION 161, CHECK IF IT IS A C, PRINT TO FILE#	
-	if($Target == 1){
-		if($AminoAcid eq "C"){
-			print $EndResults "$one\t1\n";
-			push(@notTesting, ($one . "\t1"));
-		}
-		else{
-			print $EndResults "$one\t14\n";
-			push(@notTesting, ($one . "\t14"));
-		}
-	}
-	else{
-		print $EndResults "$one\t14\n";
-		push(@notTesting, ($one . "\t14"));
-	}
+	# Check each SNP effect in the condensed SNP results file for TRP or CYS at AA 161
+	my @SNP_lines = map { [split /\t/] <$SNP_read>;
+	shift @SNP_lines; # This removes the first entry in the SNP_lines array
+	my ($Target, $AminoAcid);
 	
+	# Check to see if there was a cpsK missense mutation at amino acid position 161
+	# If that SNP is a C, keep the serotype as 1; else change to 14 and print to file
+	
+	foreach my $snp(@SNP_lines){
+		if($snp->[5] == 161){ 
+			$Target = 1;
+			$AminoAcid = $snp->[7];
+		}
+	}
+	# If the SNP in position 161 is a C, change serotype to 1; if not a C, change to 14
+	if ($i < @furtherAnalysis_1) {
+		my $result = $Target ? $AminoAcid eq "C" ? "1" : "14" : "14";
+		print $EndResults "${sample}\t$result\n";
+		push @notTesting, "${sample}\t$result";
+	} else {
+		my $result = $Target ? $AminoAcid eq "C" ? "1/2" : "2" : "2";
+		print $EndResults "${sample}\t$result\n";
+		push @notTesting, "${sample}\t$result";
+	}
+	$i++;
 }
 
-#FOR ALL OF THE 2s ALIGN TO CPSK FASTA TO SEE IF IT IS A 2 OR A 1/2#
-foreach my $two (@furtherAnalysis_2){
-	#Run Bowtie against cpsK
-	if($SingleOrPaired eq "pe"){
-		system("bowtie2 -1 $fastq_directory/$two$forward.fastq $fastq_directory/$two$reverse.fastq -S $two\_vs_cpsK.sam --very-sensitive-local --no-unal -a -x $gene_fasta");
-	}
-	elsif($SingleOrPaired eq "se"){
-		system("bowtie2 -U $fastq_directory/$two*.fastq -S $two\_vs_cpsK.sam --very-sensitive-local --no-unal -a -x $gene_fasta");		
-	}
-
-	#Run Samtools to call SNPs
-	system("samtools view -b -o $two\_vs_cpsK.bam -q 1 -S $two\_vs_cpsK.sam");
-	system("samtools sort $two\_vs_cpsK.bam $two\_vs_cpsK.sorted");
-	system("samtools mpileup -u -L 1000 -f $gene_fasta -Q 20 -q 1 $two\_vs_cpsK.sorted.bam > $two\_vs_cpsK.pileup");
-	system("bcftools view -vcg $two\_vs_cpsK.pileup > $two\_vs_cpsK.raw.vcf");
-	system("vcfutils.pl varFilter -Q 20 $two\_vs_cpsK.raw.vcf > $two\_vs_cpsK.vcf");
-
-	open my $vcf, "<$two\_vs_cpsK.vcf" or die "Can't find input file!";
-	open my $vcf_out, ">", "$two\_vs_cpsK.snps" or die $!;
-
-	#Re-write SNP file to a more readable format
-	foreach my $vcf_line (<$vcf>){
-		if(substr($vcf_line, 0, 2) ne "##"){
-			print $vcf_out $vcf_line;
-		}
-	}
-
-	open my $SNP_out, ">", "$two\_SNPeffect.txt" or die $!;
-
-	#Check AminoAcid changes caused by SNPs
-	system("perl $script_dir/SNP_AminoAcidChange.pl $two\_vs_cpsK.snps $gene_fasta > $two\_SNPeffect.txt");
-
-	#READ IN SNP EFFFECT FILE TO CHECK IF THERE IS A TRP OR CYS AT AMINO ACID POSITION 161#
-	open my $SNP_read, "<$two\_SNPeffect.txt" or die "Can't open input file!";
-
-	my @SNP_array;
-	my $SNP_line = 0;
-	my $Target = 0;
-	my $AminoAcid;
-	foreach my $snp(<$SNP_read>){
-		if($SNP_line > 0){
-		        @SNP_array = split(/\t/, $snp);
-			if($SNP_array[5] == 161){
-				$Target = 1;
-				$AminoAcid = $SNP_array[7];
-			}
-		}
-		$SNP_line++;
-	}
-
-	#IF THERE WAS A SNP AT POSITION 161, CHECK IF IT IS A C, PRINT TO FILE#		
-	if($Target == 1){
-		if($AminoAcid eq "C"){
-			print $EndResults "$two\t1/2\n";
-			push(@notTesting, ($two . "\t1/2"));
-		}
-		else{
-			print $EndResults "$two\t2\n";
-			push(@notTesting, ($two . "\t2"));
-		}
-	}
-	else{
-		print $EndResults "$two\t2\n";
-		push(@notTesting, ($two . "\t2"));
-	}
-	
-}
 
 #SORT OUTPUT FILES#
+system("mkdir pileups sorted_bam scores")
+system("mv *.pileup ./pileups \
+	&& mv *.sorted.bam ./sorted_bam \
+	&& mv *.scores ./scores");
 system("mkdir filtered_vcf pileup raw_vcf sam scores sorted_bam snp_effect snps")
 system("mv *.pileup ./pileup && mv *.sorted.bam ./sorted_bam && mv *.scores ./scores");
-
 system("mv *.sam ./sam");
-system("mv *.sorted.bam ./sorted_bam");
 system("mv *.bam ./unsorted_bam");
-system("mv *.pileup ./pileup");
 system("mv *.raw.vcf ./raw_vcf");
 system("mv *.vcf ./filtered_vcf");
 system("mv *.snps ./snps");
